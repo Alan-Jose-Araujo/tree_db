@@ -3,8 +3,8 @@ from table_schema import Column, TableSchema
 from database_manager import DatabaseManager
 
 class DatabaseCLI:
-    VALID_TYPES = {'int', 'float', 'string', 'boolean'}
-
+    VALID_TYPES = {'int', 'float', 'string', 'boolean', 'date'}
+ 
     def __init__(self, db_path):
         self.db_manager = DatabaseManager(db_path)
 

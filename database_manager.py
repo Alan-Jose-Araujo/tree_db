@@ -2,6 +2,7 @@ import os
 import json
 from bplustree import BPlusTree
 from table_schema import Column, TableSchema
+from datetime import datetime
 
 class DatabaseManager:
     def __init__(self, db_path='my_db'):
@@ -50,6 +51,12 @@ class DatabaseManager:
                 raise TypeError(f"Tipo de dado inválido para '{col_name}'. Esperado: string, recebido: {type(value).__name__}.")
             elif expected_type == 'boolean' and not isinstance(value, bool):
                 raise TypeError(f"Tipo de dado inválido para '{col_name}'. Esperado: boolean, recebido: {type(value).__name__}.")
+            elif expected_type == 'date':
+                if not isinstance(value, str):
+                    raise TypeError(f"Tipo de dado inválido para '{col_name}'. Esperado: string no formato AAAA-MM-DD, recebido: {type(value).__name__}.")
+                try:   datetime.strptime(value, '%Y-%m-%d')
+                except ValueError:
+                    raise ValueError(f"Formato de data inválido para '{col_name}'. Use o formato AAAA-MM-DD.")
         # --- FIM DA NOVA VALIDAÇÃO ---
 
         pk_name = schema.get_pk_name()
