@@ -215,7 +215,7 @@ class CreateTableWizard:
     def __init__(self, parent, existing_tables):
         self.top = tk.Toplevel(parent)
         self.top.title("Assistente de Criação de Tabela")
-        self.top.geometry("500x500")
+        self.top.geometry("550x500")
         self.top.transient(parent)
         self.top.grab_set()
 
@@ -232,9 +232,14 @@ class CreateTableWizard:
         col_frame = ttk.LabelFrame(self.top, text="Definição de Colunas")
         col_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=10, sticky="ew")
         
-        self.col_tree = ttk.Treeview(col_frame, columns=("type", "nullable"), show="headings")
+        self.col_tree = ttk.Treeview(col_frame, columns=("name", "type", "nullable"), show="headings")
+        self.col_tree.heading("name", text="Nome")
+        self.col_tree.column("name", width=150)
         self.col_tree.heading("type", text="Tipo")
+        self.col_tree.column("type", width=100)
         self.col_tree.heading("nullable", text="Permite Nulo?")
+        self.col_tree.column("nullable", width=100, anchor="center")
+
         self.col_tree.grid(row=0, column=0, columnspan=3, padx=5, pady=5)
         
         # Entradas para nova coluna
@@ -269,18 +274,24 @@ class CreateTableWizard:
             return
         
         for item in self.col_tree.get_children():
-            if self.col_tree.item(item, 'text') == name:
+            if self.col_tree.item(item, 'values')[0] == name:
                 messagebox.showerror("Erro", f"A coluna '{name}' já existe.", parent=self.top)
                 return
         
-        nullable = self.col_nullable_var.get()
-        self.col_tree.insert("", "end", text=name, values=(dtype, 'Sim' if nullable else 'Não'))
+        nullable_str = 'Sim' if self.col_nullable_var.get() else 'Não'
+
+        self.col_tree.insert("", "end", values=(name, dtype, nullable_str))
+
         self.col_name_entry.delete(0, tk.END)
         self.update_pk_options()
 
     def update_pk_options(self):
-        # Apenas colunas que não permitem nulos podem ser PK
-        pk_candidates = [self.col_tree.item(item, 'text') for item in self.col_tree.get_children() if self.col_tree.item(item, 'values')[1] == 'Não']
+        # Acessa o nome e a nulidade pelos índices corretos em 'values'
+        pk_candidates = [
+            self.col_tree.item(item, 'values')[0]
+            for item in self.col_tree.get_children()
+            if self.col_tree.item(item, 'values')[2] == 'Não'
+        ]
         self.pk_combo['values'] = pk_candidates
         if pk_candidates:
             self.pk_combo.set(pk_candidates[0])
@@ -298,9 +309,10 @@ class CreateTableWizard:
 
         cols = []
         for item in self.col_tree.get_children():
-            name = self.col_tree.item(item, 'text')
-            dtype = self.col_tree.item(item, 'values')[0]
-            nullable = self.col_tree.item(item, 'values')[1] == 'Sim'
+            values = self.col_tree.item(item, 'values')
+            name = values[0]
+            dtype = values[1]
+            nullable = values[2] == 'Sim'
             cols.append(Column(name, dtype, nullable))
 
         if not cols:
@@ -311,6 +323,6 @@ class CreateTableWizard:
             'name': table_name,
             'columns': cols,
             'pk_name': pk_name,
-            'foreign_keys': [] # Simplificado para este wizard, pode ser expandido
+            'foreign_keys': []
         }
         self.top.destroy()
