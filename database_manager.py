@@ -16,17 +16,46 @@ class DatabaseManager:
         if schema.name in self.tables:
             raise ValueError(f"Tabela '{schema.name}' já existe.")
         self.tables[schema.name] = schema
-        self.data[schema.name] = BPlusTree(order=50) # Ordem maior para menos acessos a disco
+        self.data[schema.name] = BPlusTree(order=50)
     
     def insert(self, table_name, record: dict):
         if table_name not in self.tables:
             raise ValueError(f"Tabela '{table_name}' não encontrada.")
         
         schema = self.tables[table_name]
+
+        # --- NOVA VALIDAÇÃO DE ESQUEMA E TIPOS ---
+        # 1. Verificar se o registro não contém colunas que não existem no esquema
+        for col_name in record:
+            if col_name not in schema.columns:
+                raise ValueError(f"Coluna '{col_name}' não existe no esquema da tabela '{table_name}'.")
+
+        # 2. Validar cada coluna definida no esquema contra o registro
+        for col_name, col_schema in schema.columns.items():
+            value = record.get(col_name)
+            expected_type = col_schema.data_type.lower()
+
+            # A. Validação de Nulidade
+            if value is None:
+                if not col_schema.nullable:
+                    raise ValueError(f"Erro de integridade: Coluna '{col_name}' não pode ser nula.")
+                continue # O valor é nulo e a coluna permite, então está OK.
+
+            # B. Validação de Tipos de Dados
+            if expected_type == 'int' and not isinstance(value, int):
+                raise TypeError(f"Tipo de dado inválido para '{col_name}'. Esperado: int, recebido: {type(value).__name__}.")
+            elif expected_type == 'float' and not isinstance(value, (int, float)):
+                raise TypeError(f"Tipo de dado inválido para '{col_name}'. Esperado: float, recebido: {type(value).__name__}.")
+            elif expected_type == 'string' and not isinstance(value, str):
+                raise TypeError(f"Tipo de dado inválido para '{col_name}'. Esperado: string, recebido: {type(value).__name__}.")
+            elif expected_type == 'boolean' and not isinstance(value, bool):
+                raise TypeError(f"Tipo de dado inválido para '{col_name}'. Esperado: boolean, recebido: {type(value).__name__}.")
+        # --- FIM DA NOVA VALIDAÇÃO ---
+
         pk_name = schema.get_pk_name()
         pk_value = record.get(pk_name)
 
-        # Validações...
+        # Validações de Chaves (PK e FK)
         if pk_value is None:
             raise ValueError(f"Erro de integridade: Chave primária '{pk_name}' não pode ser nula.")
         if self.data[table_name].search(pk_value) is not None:
@@ -75,7 +104,6 @@ class DatabaseManager:
             raise ValueError(f"Registro com PK '{pk_value}' não encontrado para deleção.")
 
     def save_to_disk(self):
-        # Salva metadados
         metadata_path = os.path.join(self.db_path, 'metadata.json')
         metadata = { name: schema.__dict__ for name, schema in self.tables.items() }
         for name in metadata:
@@ -83,7 +111,6 @@ class DatabaseManager:
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=4)
         
-        # Salva dados
         for table_name, tree in self.data.items():
             data_path = os.path.join(self.db_path, f"{table_name}.json")
             with open(data_path, 'w') as f:
